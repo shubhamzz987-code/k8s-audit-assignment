@@ -1,0 +1,38 @@
+# Example only. To use it, copy this file to .github/workflows/ in your repo root
+# and fix the paths. Left here, GitHub will not run it.
+name: deploy-to-kind
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create the same 3-node cluster you use locally
+        uses: helm/kind-action@v1
+        with:
+          config: kind/kind-config.yaml
+          cluster_name: audit
+
+      - name: Build and load images
+        run: |
+          for app in vote result worker; do
+            docker build -t "$app:1.0" "sample-app/$app"
+            kind load docker-image "$app:1.0" --name audit
+          done
+
+      - name: Deploy
+        run: |
+          kubectl apply -f examples/sample-app-k8s/
+          for d in db redis vote result worker; do
+            kubectl -n vote rollout status "deploy/$d" --timeout=180s
+          done
+
+      - name: Smoke test
+        run: |
+          kubectl -n vote port-forward svc/vote 8081:80 &
+          sleep 3
+          curl -fsS http://localhost:8081/ | grep -qi "cats\|kubernetes"
