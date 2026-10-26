@@ -2,8 +2,9 @@
 # and fix the paths. Left here, GitHub will not run it.
 name: deploy-to-kind
 on:
-  pull_request:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   deploy:
